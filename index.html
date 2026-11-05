@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agende seu horário</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#2b1a33;--paper:#f7f2f6;--card:#fff;--line:#e7dbe4;--mu:#7d6a7a;--ac:#c2245f;--acd:#a11b4d;--soft:#fbe7ef;--ok:#23795a;--er:#c0392b;
+--ser:Fraunces,Georgia,"Times New Roman",serif;--san:Figtree,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 var(--san);-webkit-font-smoothing:antialiased}
+:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+label{display:block;font-size:13px;font-weight:500;color:var(--mu);margin:14px 0 6px}
+input,select,textarea{width:100%;min-height:46px;padding:10px 13px;border:1.5px solid var(--line);border-radius:12px;background:#fff;color:var(--ink);font:inherit}
+textarea{min-height:76px;resize:vertical}input[type=checkbox]{width:auto;min-height:0}
+input:focus,select:focus,textarea:focus{border-color:var(--ac);outline:3px solid var(--soft)}
+.btn{display:block;width:100%;margin-top:18px;padding:14px 18px;border:0;border-radius:12px;background:var(--ac);color:#fff;font:600 16px var(--san);cursor:pointer;transition:background .15s}
+.btn:hover{background:var(--acd)}.btn:disabled{opacity:.5;cursor:wait}
+.msg{margin-top:14px;padding:12px 14px;border-radius:12px;background:var(--soft)}.msg.er{color:var(--er)}.msg.ok{color:var(--ok)}
+.mu{color:var(--mu)}.hide{display:none!important}.er{color:var(--er)}
+
+.hero{background:var(--ink);color:#fbeef3;padding:38px 20px 84px;border-radius:0 0 36px 36px}
+.hero .in{max-width:520px;margin:0 auto}
+.hero h1{font:600 36px/1.1 var(--ser);margin:0 0 10px;letter-spacing:-.01em}
+.hero p{margin:0;color:#cdb6cc;max-width:34ch}
+.sheet{max-width:520px;margin:-52px auto 40px;padding:0 14px}
+.card{background:var(--card);border-radius:22px;padding:8px 20px 22px;box-shadow:0 12px 40px -18px rgba(43,26,51,.35)}
+section{padding:14px 0 6px}section+section{border-top:1px solid var(--line)}
+h2{display:flex;align-items:center;gap:10px;font:600 19px var(--ser);margin:10px 0 0}
+h2 i{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--ink);color:#fff;font:600 13px var(--san);font-style:normal}
+.slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:8px;margin-top:14px}
+.slot{padding:11px 0;border:1.5px solid var(--line);border-radius:12px;background:#fff;color:var(--ink);font:600 15px var(--san);cursor:pointer;font-variant-numeric:tabular-nums}
+.slot:hover:not(:disabled){border-color:var(--ac)}.slot.on{background:var(--ink);border-color:var(--ink);color:#fff}
+.slot:disabled{opacity:.35;text-decoration:line-through;cursor:not-allowed}
+.chk{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--mu);margin-top:16px}.chk input{margin-top:3px;accent-color:var(--ac)}
+#f>h2{margin-top:18px}#f>p{margin:10px 0}
+</style></head><body>
+<header class="hero"><div class="in"><h1 id="brand">Seu Salão</h1><p>Escolha o serviço, o dia e o horário. A confirmação é na hora.</p></div></header>
+<main class="sheet"><div class="card" id="f">
+<section><h2><i>1</i>Serviço e profissional</h2><label>Serviço</label><select id="srv"></select><label>Com quem</label><select id="pro"></select></section>
+<section><h2><i>2</i>Dia e horário</h2><label>Data</label><input type="date" id="date"><div id="slots" class="slots"></div></section>
+<section><h2><i>3</i>Seus dados</h2><label>Nome</label><input id="name" autocomplete="name"><label>WhatsApp (com DDD)</label><input id="tel" inputmode="tel" autocomplete="tel" placeholder="(11) 99999-9999"><label>E-mail (opcional)</label><input id="email" type="email" autocomplete="email">
+<label class="chk"><input type="checkbox" id="lgpd"><span>Concordo que meu nome e telefone sejam usados para gerenciar este agendamento e enviar lembretes.</span></label></section>
+<button class="btn" id="go">Confirmar agendamento</button><div id="msg"></div></div></main>
+<script>
+// ===== CONFIGURE AQUI (Supabase > Project Settings > API) =====
+const SUPABASE_URL="https://kuqqejsecgycrhejkxzg.supabase.co";
+const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1cXFlanNlY2d5Y3JoZWpreHpnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwMTg3MjYsImV4cCI6MjEwNzU5NDcyNn0.IOmrxbB3w9MeHDSwJScW2XJFv4IIlHWX3TVypgJ9uf4";
+const SALON_NAME="Agenda Salão"; // nome que aparece no topo da página
+// ==============================================================
+document.getElementById("brand").textContent=SALON_NAME;document.title="Agende na "+SALON_NAME;
+const U=(()=>{try{return new URL(SUPABASE_URL.trim()).origin}catch(e){return SUPABASE_URL}})();
+const sb=supabase.createClient(U,SUPABASE_ANON_KEY.trim()),$=i=>document.getElementById(i);
+const fmt=m=>String(m/60|0).padStart(2,"0")+":"+String(m%60).padStart(2,"0");
+const ymd=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+const br=d=>d.split("-").reverse().join("/"),esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let S=[],P=[],busy=[],sel=null;
+const say=(t,c)=>$("msg").innerHTML=`<div class="msg ${c}">${t}</div>`;
+async function init(){
+  $("date").value=$("date").min=ymd(new Date());
+  const [a,b]=await Promise.all([sb.from("services").select("*").order("name"),sb.from("professionals").select("*").order("name")]);
+  if(a.error||b.error)return say("Não foi possível carregar. Tente novamente mais tarde.","er");
+  S=a.data;P=b.data;
+  $("srv").innerHTML=S.map(s=>`<option value="${s.id}">${esc(s.name)} · ${s.duration}min · R$ ${s.price}</option>`).join("");
+  fillPros();refresh();
+}
+function fillPros(){const sid=+$("srv").value,k=$("pro").value,l=P.filter(p=>!p.service_ids?.length||p.service_ids.includes(sid));
+  $("pro").innerHTML=l.length?l.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join(""):'<option value="">Nenhum profissional para este serviço</option>';
+  if([...$("pro").options].some(o=>o.value===k))$("pro").value=k}
+async function refresh(){
+  sel=null;const p=P.find(x=>x.id==$("pro").value),s=S.find(x=>x.id==$("srv").value),d=$("date").value;
+  if(!p||!s||!d){$("slots").innerHTML="";return}
+  const {data}=await sb.rpc("get_busy",{p_pro:p.id,p_date:d});busy=data||[];draw();
+}
+function draw(){
+  const p=P.find(x=>x.id==$("pro").value),s=S.find(x=>x.id==$("srv").value),d=$("date").value,n=new Date(),nm=n.getHours()*60+n.getMinutes(),out=[];
+  if(p.days.includes(new Date(d+"T12:00").getDay()))
+    for(let t=p.open_min;t+s.duration<=p.close_min;t+=30){
+      const ok=!busy.some(b=>t<b.start_min+b.duration&&b.start_min<t+s.duration)&&(d!==ymd(n)||t>nm);
+      out.push(`<button class="slot ${t===sel?"on":""}" ${ok?"":"disabled"} data-t="${t}">${fmt(t)}</button>`)}
+  $("slots").innerHTML=out.join("")||'<span style="color:var(--mu)">Sem horários neste dia.</span>';
+}
+$("slots").onclick=e=>{const b=e.target.closest(".slot");if(b&&!b.disabled){sel=+b.dataset.t;draw()}};
+["srv","pro","date"].forEach(i=>$(i).onchange=()=>{if(i==="srv")fillPros();refresh()});
+$("go").onclick=async()=>{
+  const name=$("name").value.trim(),tel=$("tel").value.trim();
+  if(name.length<2||tel.replace(/\D/g,"").length<10)return say("Informe seu nome e um WhatsApp válido.","er");
+  if(sel==null)return say("Escolha um horário.","er");
+  if(!$("lgpd").checked)return say("Aceite o uso dos dados para continuar.","er");
+  $("go").disabled=true;
+  const {error}=await sb.rpc("create_booking",{p_pro:+$("pro").value,p_service:+$("srv").value,p_date:$("date").value,p_start:sel,p_name:name,p_tel:tel,p_email:$("email").value.trim()||null});
+  $("go").disabled=false;
+  if(error){await refresh();return say(/horario_ocupado/.test(error.message)?"Esse horário acabou de ser ocupado. Escolha outro.":"Não foi possível agendar. Confira os dados e tente de novo.","er")}
+  const p=P.find(x=>x.id==$("pro").value),s=S.find(x=>x.id==$("srv").value);
+  $("f").innerHTML=`<h2>Agendado! ✅</h2><p>${esc(s.name)} com ${esc(p.name)}<br><b>${br($("date").value)} às ${fmt(sel)}</b></p><p style="color:var(--mu)">Para remarcar ou cancelar, fale com o salão pelo WhatsApp.</p>`;
+};
+init();
+</script></body></html>
